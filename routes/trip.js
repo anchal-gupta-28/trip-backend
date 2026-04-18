@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Trip = require("../models/Trip");
 const authMiddleware = require("../middleware/authMiddleware");
+const upload = require("../middleware/upload");
 
 
 // ➕ Create Trip
@@ -129,5 +130,51 @@ router.delete("/:id", authMiddleware, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+router.post(
+  "/:id/memories",
+  authMiddleware,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      console.log("FILE:", req.file);
+      console.log("BODY:", req.body);
+
+      // ❌ No image uploaded
+      if (!req.file) {
+        return res.status(400).json({ message: "No image uploaded" });
+      }
+
+      const { place, date } = req.body;
+
+      const trip = await Trip.findOne({
+        _id: req.params.id,
+        user: req.user.id
+      });
+
+      if (!trip) {
+        return res.status(404).json({ message: "Trip not found" });
+      }
+
+      // ✅ Save memory
+      trip.memories.push({
+        image: `/uploads/${req.file.filename}`,  // cleaner path
+        place,
+        date
+      });
+
+      await trip.save();
+
+      res.json({
+        message: "Memory added successfully",
+        trip
+      });
+
+    } catch (error) {
+      console.error("UPLOAD ERROR:", error);
+      res.status(500).json({ message: "Error uploading memory" });
+    }
+  }
+);
 
 module.exports = router;
